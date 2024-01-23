@@ -152,27 +152,41 @@ def read_image_as_pil(image: Union[Image.Image, str, np.ndarray], exif_fix: bool
     if isinstance(image, Image.Image):
         image_pil = image
     elif isinstance(image, str):
-        # read image if str image path is provided
-        try:
-            image_pil = Image.open(
-                requests.get(image, stream=True).raw if str(image).startswith("http") else image
-            ).convert("RGB")
-            if exif_fix:
-                image_pil = exif_transpose(image_pil)
-        except:  # handle large/tiff image reading
+
+        if image.endswith(".tif"):
+
+            class PseudoPIL(np.ndarray):
+                def __init__(self, array, filename):
+                    super().__init__(self, array)
+                    self.size = (array.shape[1], array.shape[0])
+                    self.filename = filename
+
+            from tifffile import TiffFile
+            with TiffFile(image) as tif:
+                image_pil = PseudoPIL(tif.asarray())
+        else:
+
+            # read image if str image path is provided
             try:
-                import skimage.io
-            except ImportError:
-                raise ImportError("Please run 'pip install -U scikit-image imagecodecs' for large image handling.")
-            image_sk = skimage.io.imread(image).astype(np.uint8)
-            if len(image_sk.shape) == 2:  # b&w
-                image_pil = Image.fromarray(image_sk, mode="1")
-            elif image_sk.shape[2] == 4:  # rgba
-                image_pil = Image.fromarray(image_sk, mode="RGBA")
-            elif image_sk.shape[2] == 3:  # rgb
-                image_pil = Image.fromarray(image_sk, mode="RGB")
-            else:
-                raise TypeError(f"image with shape: {image_sk.shape[3]} is not supported.")
+                image_pil = Image.open(
+                    requests.get(image, stream=True).raw if str(image).startswith("http") else image
+                ).convert("RGB")
+                if exif_fix:
+                    image_pil = exif_transpose(image_pil)
+            except:  # handle large/tiff image reading
+                try:
+                    import skimage.io
+                except ImportError:
+                    raise ImportError("Please run 'pip install -U scikit-image imagecodecs' for large image handling.")
+                image_sk = skimage.io.imread(image).astype(np.uint8)
+                if len(image_sk.shape) == 2:  # b&w
+                    image_pil = Image.fromarray(image_sk, mode="1")
+                elif image_sk.shape[2] == 4:  # rgba
+                    image_pil = Image.fromarray(image_sk, mode="RGBA")
+                elif image_sk.shape[2] == 3:  # rgb
+                    image_pil = Image.fromarray(image_sk, mode="RGB")
+                else:
+                    raise TypeError(f"image with shape: {image_sk.shape[3]} is not supported.")
     elif isinstance(image, np.ndarray):
         if image.shape[0] < 5:  # image in CHW
             image = image[:, :, ::-1]
