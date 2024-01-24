@@ -154,16 +154,10 @@ def read_image_as_pil(image: Union[Image.Image, str, np.ndarray], exif_fix: bool
     elif isinstance(image, str):
 
         if image.endswith(".tif"):
-
-            class PseudoPIL(np.ndarray):
-                def __init__(self, array, filename):
-                    super().__init__(self, array)
-                    self.size = (array.shape[1], array.shape[0])
-                    self.filename = filename
-
             from tifffile import TiffFile
-            with TiffFile(image) as tif:
-                image_pil = PseudoPIL(tif.asarray())
+            image_pil = TiffFile(image)
+            # image_pil.filename = image
+            image_pil.size = (image_pil.asarray().shape[1], image_pil.asarray().shape[0])
         else:
 
             # read image if str image path is provided
@@ -190,7 +184,10 @@ def read_image_as_pil(image: Union[Image.Image, str, np.ndarray], exif_fix: bool
     elif isinstance(image, np.ndarray):
         if image.shape[0] < 5:  # image in CHW
             image = image[:, :, ::-1]
-        image_pil = Image.fromarray(image)
+        try:
+            image_pil = Image.fromarray(image)
+        except:
+            image_pil = image
     else:
         raise TypeError("read image with 'pillow' using 'Image.open()'")
     return image_pil

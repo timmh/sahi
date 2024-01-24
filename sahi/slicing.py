@@ -319,10 +319,12 @@ def slice_image(
         image_pil = read_image_as_pil(image)
         slice_file_path = str(Path(output_dir) / slice_file_name)
         # export sliced image
-        if str(slice_file_path).endswith(".tif"):
+        if slice_file_path.endswith(".tif"):
+            assert isinstance(image_pil, np.ndarray)
             from tifffile import imwrite
             imwrite(str(slice_file_path), np.asarray(image_pil))
         else:
+            assert not isinstance(image_pil, np.ndarray)
             image_pil.save(slice_file_path, quality="keep")
             image_pil.close()  # to fix https://github.com/obss/sahi/issues/565
         verboselog("sliced image path: " + slice_file_path)
@@ -353,7 +355,10 @@ def slice_image(
     # init images and annotations lists
     sliced_image_result = SliceImageResult(original_image_size=[image_height, image_width], image_dir=output_dir)
 
-    image_pil_arr = np.asarray(image_pil)
+    if hasattr(image_pil, "asarray"):
+        image_pil_arr = image_pil.asarray()
+    else:
+        image_pil_arr = np.asarray(image_pil)
     # iterate over slices
     for slice_bbox in slice_bboxes:
         n_ims += 1
